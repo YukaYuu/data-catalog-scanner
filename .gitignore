@@ -1,0 +1,22 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# go
+api/api
+api/*.test
+
+# data (generated at seed/scan time, not source-of-truth)
+seed-data/*.sqlite
+seed-data/pgdata/
+
+# os
+.DS_Store
+
+# claude code
+.claude/
+AGENTS.md
+CLAUDE.md
