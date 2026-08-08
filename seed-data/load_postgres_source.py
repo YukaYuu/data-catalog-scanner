@@ -76,6 +76,13 @@ def load_postgres_source() -> None:
     try:
         with conn.cursor() as cur:
             cur.execute(CREATE_SCHEMA_SQL)
+            # This source gets rebuilt fresh on every seed run (compose
+            # dependency resolution can legitimately re-run seed), so
+            # start from empty rather than accumulating duplicates.
+            cur.execute("TRUNCATE TABLE source_realestate.transactions")
+            cur.execute(
+                "TRUNCATE TABLE source_realestate.ward_population RESTART IDENTITY CASCADE"
+            )
 
             psycopg2.extras.execute_values(
                 cur,
