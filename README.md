@@ -75,9 +75,21 @@ represent every SQL type uniformly, and a typed union would leak
 engine-specific type systems back into the API layer this project is trying
 to keep engine-agnostic.
 
-## Two bugs worth mentioning
+This is also what actually found a real data-quality bug, not a synthetic
+one: `building_structure` in the real-estate source had 38 rows where the
+value was the literal text `"NaN"` instead of a real `NULL`. The seed
+loader's numeric columns were all guarded with `pd.notna(...)`, but the
+free-text columns (`district`, `nearest_station`, `floor_plan`,
+`building_structure`) used `row.get(...)` unguarded -- so a missing
+value stayed as pandas' `float('nan')`, and psycopg2 happily inserted that
+into a `TEXT` column as the literal string `"NaN"` instead of `NULL`. Profiling
+surfaced it immediately: `building_structure`'s `min_value` was `"NaN"`
+(sorts before any Japanese text). Fixed in `seed-data/load_postgres_source.py`
+by adding the same `pd.notna(...)` guard to all four text columns.
 
-Both were caught by actually running the system end-to-end, not by
+## Three bugs worth mentioning
+
+All three were caught by actually running the system end-to-end, not by
 inspection:
 
 1. **NULL isn't equal to NULL for uniqueness.** The catalog's dedup key is
@@ -97,6 +109,12 @@ inspection:
    `ward_population` was already safe (`ON CONFLICT ... DO NOTHING` on a real
    key), but `transactions` has no natural key to dedup rows on, so it now
    truncates and reloads instead (`seed-data/load_postgres_source.py`).
+
+3. **Missing values became the literal text `"NaN"`.** See "Column
+   profiling" above -- four free-text columns in the seed loader lacked the
+   `pd.notna(...)` guard the numeric columns had, so pandas' NaN reached
+   Postgres unconverted and landed in a `TEXT` column as a real, searchable
+   `"NaN"` string instead of `NULL`.
 
 ## Tech stack
 
