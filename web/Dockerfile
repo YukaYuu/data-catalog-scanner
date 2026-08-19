@@ -12,6 +12,9 @@ FROM node:22-slim
 WORKDIR /app
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
+# No `COPY .../public ./public` here: public/ is empty (this app has no
+# static assets to serve) and, being empty, isn't even tracked by git --
+# copying it broke the CI build on a fresh clone even though it worked
+# locally against the leftover directory create-next-app had scaffolded.
 EXPOSE 3000
 CMD ["node", "server.js"]
