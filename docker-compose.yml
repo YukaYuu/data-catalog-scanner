@@ -48,6 +48,19 @@ services:
     ports:
       - "8080:8080"
 
+  web:
+    build: ./web
+    depends_on:
+      # api has no healthcheck (it's a fast-booting Go binary and none of
+      # the other services have one either), so this is service_started
+      # rather than a real readiness gate -- same tradeoff already made
+      # for api's own dependency on scanner completing.
+      - api
+    environment:
+      CATALOG_API_URL: http://api:8080
+    ports:
+      - "3000:3000"
+
 volumes:
   pgdata:
   sqlite-data:

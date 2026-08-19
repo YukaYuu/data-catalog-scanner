@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* This is a small internal tool, not a themed product -- deliberately
+   light-only rather than following prefers-color-scheme, so the body
+   background set via Tailwind classes in layout.tsx (bg-slate-50) is the
+   single source of truth instead of competing with a CSS variable here. */
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}

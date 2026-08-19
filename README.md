@@ -11,6 +11,7 @@ model, and serve that catalog over an API for searching.
                       and writes the result into a catalog schema
                       (catalog.tables / catalog.columns) in Postgres.
 3. api (Go)          reads the catalog schema and serves it over REST.
+4. web (TypeScript)  a read-only Next.js browser on top of the API.
 ```
 
 ## Why two source types
@@ -43,8 +44,8 @@ docker compose up
 ```
 
 This runs the whole pipeline in order: brings up Postgres, seeds both
-source systems with data, scans them into the catalog, then starts the API
-on `:8080`.
+source systems with data, scans them into the catalog, starts the API on
+`:8080`, then starts the web UI on `:3000`.
 
 ```bash
 curl http://localhost:8080/api/tables
@@ -56,6 +57,29 @@ curl "http://localhost:8080/api/search?q=congestion"
 `EXISTS`), since searching by column is usually the more useful query in a
 real catalog -- `q=congestion` finds both `areas` and `spots` because they
 both have a `congestion` column, even though neither table name mentions it.
+
+## Browsing the catalog
+
+`web/` is a minimal Next.js app: a table list with search, and a detail page
+showing each column's structure and profile stats. A few decisions worth
+explaining:
+
+- **Server Components, not a client-side fetch.** Every page is an async
+  Server Component that calls the Go API directly during rendering --
+  there's no `"use client"`/`useEffect`/loading-spinner dance anywhere,
+  because this is a read-only catalog browser with no client state to
+  manage. The practical payoff: the browser never talks to the API
+  directly, only the Next.js server does, so the Go API needs zero CORS
+  configuration.
+- **Search is a plain `<form method="GET">`.** Submitting it is just a
+  normal navigation to `/?q=...`, which Next reads out of `searchParams`
+  server-side. No client JS needed for that either.
+- **`getTable` returns `null` on a 404**, rather than throwing, so the page
+  can call Next's `notFound()` and render a real not-found view instead of
+  a generic error boundary swallowing the distinction between "this table
+  doesn't exist" and "the API is down."
+
+See `web/README.md` for how to run it.
 
 ## Column profiling
 
@@ -122,6 +146,8 @@ inspection:
   for SQLite, `pytest` for tests
 - **Go** (API) -- stdlib `net/http` with Go 1.22+ pattern routing (no router
   dependency), `pgx` for Postgres
+- **TypeScript** (web) -- Next.js App Router, Server Components only (no
+  client-side data fetching), Tailwind CSS
 - **PostgreSQL** as both a scan target and the catalog store
 - **Docker Compose** to wire the pipeline together
 
