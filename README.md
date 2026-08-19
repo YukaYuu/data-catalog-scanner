@@ -57,6 +57,24 @@ curl "http://localhost:8080/api/search?q=congestion"
 real catalog -- `q=congestion` finds both `areas` and `spots` because they
 both have a `congestion` column, even though neither table name mentions it.
 
+## Column profiling
+
+Beyond structure (type, nullability, primary key), each column also gets
+profiled: `null_count`, `distinct_count`, `min_value`, `max_value`
+(`ColumnProfile` in `scanner/src/scanner/models.py`). This is the difference
+between "this column is TEXT" and "this column is TEXT, 1% NULL, mostly one
+of four values" -- the latter is what actually tells you whether a column is
+safe to join on or worth deduplicating.
+
+Both connectors compute all four columns in **one query per table**, not one
+per column -- an N+1 query pattern here would mean a table with 20 columns
+runs 20 separate scans of itself. `min_value`/`max_value` are stored as text
+(`CAST(...  AS TEXT)` / `::text`) rather than a typed value, for the same
+reason `data_type` is already a plain string: the common model has to
+represent every SQL type uniformly, and a typed union would leak
+engine-specific type systems back into the API layer this project is trying
+to keep engine-agnostic.
+
 ## Two bugs worth mentioning
 
 Both were caught by actually running the system end-to-end, not by

@@ -66,7 +66,7 @@ func TestGetTableHandler_NotFound(t *testing.T) {
 func TestGetTableHandler_Found(t *testing.T) {
 	detail := &TableDetail{
 		TableSummary: TableSummary{ID: 1, TableName: "widgets"},
-		Columns:      []Column{{Name: "id"}},
+		Columns:      []Column{{Name: "id", NullCount: int64Ptr(0), DistinctCount: int64Ptr(2)}},
 	}
 	store := &fakeStore{tableByID: map[int]*TableDetail{1: detail}}
 	mux := NewMux(store)
@@ -85,7 +85,21 @@ func TestGetTableHandler_Found(t *testing.T) {
 	if len(got.Columns) != 1 || got.Columns[0].Name != "id" {
 		t.Fatalf("unexpected response: %+v", got)
 	}
+	// Profile fields (null_count, distinct_count, min/max) should flow
+	// through the JSON response as-is, including when min/max are absent
+	// (nil *string, matching the "no non-null values to compare" case).
+	if got.Columns[0].NullCount == nil || *got.Columns[0].NullCount != 0 {
+		t.Fatalf("expected null_count 0, got %+v", got.Columns[0].NullCount)
+	}
+	if got.Columns[0].DistinctCount == nil || *got.Columns[0].DistinctCount != 2 {
+		t.Fatalf("expected distinct_count 2, got %+v", got.Columns[0].DistinctCount)
+	}
+	if got.Columns[0].MinValue != nil {
+		t.Fatalf("expected min_value nil, got %+v", got.Columns[0].MinValue)
+	}
 }
+
+func int64Ptr(v int64) *int64 { return &v }
 
 func TestGetTableHandler_InvalidID(t *testing.T) {
 	store := &fakeStore{}

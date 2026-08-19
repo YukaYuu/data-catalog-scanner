@@ -1,6 +1,6 @@
 import psycopg2
 
-from scanner.models import ColumnMetadata, TableMetadata
+from scanner.models import ColumnMetadata, ColumnProfile, TableMetadata
 
 
 class PostgresConnector:
@@ -72,6 +72,8 @@ class PostgresConnector:
             """,
             {"schema": self.schema, "table": table_name},
         )
+        rows = cur.fetchall()
+        profiles = self._profile_columns(cur, table_name, [row[0] for row in rows])
         return [
             ColumnMetadata(
                 name=name,
@@ -79,6 +81,45 @@ class PostgresConnector:
                 is_nullable=(is_nullable == "YES"),
                 is_primary_key=is_pk,
                 ordinal_position=ordinal,
+                profile=profiles.get(name),
             )
-            for name, data_type, is_nullable, ordinal, is_pk in cur.fetchall()
+            for name, data_type, is_nullable, ordinal, is_pk in rows
         ]
+
+    def _profile_columns(self, cur, table_name: str, column_names: list[str]) -> dict[str, ColumnProfile]:
+        """One query per table (not one per column) computing null_count,
+        distinct_count, min, and max for every column at once -- avoids an
+        N+1 query pattern on wide tables.
+
+        column_names comes from information_schema above, never from
+        untrusted input, so building the SELECT list with f-strings is safe
+        (same trust boundary as _row_count above).
+
+        SUM(CASE WHEN ... THEN 1 ELSE 0 END) is used for null_count instead
+        of COUNT(*) FILTER (WHERE ...): both work on Postgres, but SQLite's
+        connector needs the CASE form anyway (FILTER support depends on the
+        SQLite version), so using the same expression in both connectors
+        keeps the two implementations easier to compare. SUM over zero rows
+        returns NULL (not 0), which the `or 0` below accounts for.
+        """
+        if not column_names:
+            return {}
+        select_parts = [
+            f'SUM(CASE WHEN "{col}" IS NULL THEN 1 ELSE 0 END) AS "{col}__nulls", '
+            f'COUNT(DISTINCT "{col}") AS "{col}__distinct", '
+            f'MIN("{col}")::text AS "{col}__min", '
+            f'MAX("{col}")::text AS "{col}__max"'
+            for col in column_names
+        ]
+        cur.execute(f'SELECT {", ".join(select_parts)} FROM "{self.schema}"."{table_name}"')
+        row = cur.fetchone()
+        values = dict(zip((desc[0] for desc in cur.description), row))
+        return {
+            col: ColumnProfile(
+                null_count=values[f"{col}__nulls"] or 0,
+                distinct_count=values[f"{col}__distinct"],
+                min_value=values[f"{col}__min"],
+                max_value=values[f"{col}__max"],
+            )
+            for col in column_names
+        }

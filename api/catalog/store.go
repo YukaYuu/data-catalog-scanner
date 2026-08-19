@@ -12,11 +12,15 @@ import (
 var ErrNotFound = errors.New("not found")
 
 type Column struct {
-	Name            string `json:"name"`
-	DataType        string `json:"data_type"`
-	IsNullable      bool   `json:"is_nullable"`
-	IsPrimaryKey    bool   `json:"is_primary_key"`
-	OrdinalPosition int    `json:"ordinal_position"`
+	Name            string  `json:"name"`
+	DataType        string  `json:"data_type"`
+	IsNullable      bool    `json:"is_nullable"`
+	IsPrimaryKey    bool    `json:"is_primary_key"`
+	OrdinalPosition int     `json:"ordinal_position"`
+	NullCount       *int64  `json:"null_count"`
+	DistinctCount   *int64  `json:"distinct_count"`
+	MinValue        *string `json:"min_value"`
+	MaxValue        *string `json:"max_value"`
 }
 
 type TableSummary struct {
@@ -98,7 +102,8 @@ func (s *PostgresStore) GetTable(ctx context.Context, id int) (*TableDetail, err
 	}
 
 	rows, err := s.db.QueryContext(ctx, `
-        SELECT name, data_type, is_nullable, is_primary_key, ordinal_position
+        SELECT name, data_type, is_nullable, is_primary_key, ordinal_position,
+               null_count, distinct_count, min_value, max_value
         FROM catalog.columns
         WHERE table_id = $1
         ORDER BY ordinal_position
@@ -110,7 +115,8 @@ func (s *PostgresStore) GetTable(ctx context.Context, id int) (*TableDetail, err
 
 	for rows.Next() {
 		var c Column
-		if err := rows.Scan(&c.Name, &c.DataType, &c.IsNullable, &c.IsPrimaryKey, &c.OrdinalPosition); err != nil {
+		if err := rows.Scan(&c.Name, &c.DataType, &c.IsNullable, &c.IsPrimaryKey, &c.OrdinalPosition,
+			&c.NullCount, &c.DistinctCount, &c.MinValue, &c.MaxValue); err != nil {
 			return nil, fmt.Errorf("scan column: %w", err)
 		}
 		detail.Columns = append(detail.Columns, c)

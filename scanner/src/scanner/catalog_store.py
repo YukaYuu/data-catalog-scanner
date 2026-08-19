@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS catalog.columns (
     is_primary_key BOOLEAN NOT NULL,
     ordinal_position INTEGER NOT NULL
 );
+
+-- ADD COLUMN IF NOT EXISTS rather than folding these into the CREATE TABLE
+-- above: pgdata is a named Docker volume (see docker-compose.yml), so a
+-- catalog.columns table created by an older version of this scanner
+-- persists across `docker compose up` and CREATE TABLE IF NOT EXISTS alone
+-- would silently skip adding these columns to it.
+ALTER TABLE catalog.columns ADD COLUMN IF NOT EXISTS null_count BIGINT;
+ALTER TABLE catalog.columns ADD COLUMN IF NOT EXISTS distinct_count BIGINT;
+ALTER TABLE catalog.columns ADD COLUMN IF NOT EXISTS min_value TEXT;
+ALTER TABLE catalog.columns ADD COLUMN IF NOT EXISTS max_value TEXT;
 """
 
 
@@ -77,7 +87,8 @@ class CatalogStore:
                 cur,
                 """
                 INSERT INTO catalog.columns
-                    (table_id, name, data_type, is_nullable, is_primary_key, ordinal_position)
+                    (table_id, name, data_type, is_nullable, is_primary_key, ordinal_position,
+                     null_count, distinct_count, min_value, max_value)
                 VALUES %s
                 """,
                 [
@@ -88,6 +99,10 @@ class CatalogStore:
                         c.is_nullable,
                         c.is_primary_key,
                         c.ordinal_position,
+                        c.profile.null_count if c.profile else None,
+                        c.profile.distinct_count if c.profile else None,
+                        c.profile.min_value if c.profile else None,
+                        c.profile.max_value if c.profile else None,
                     )
                     for c in table.columns
                 ],
