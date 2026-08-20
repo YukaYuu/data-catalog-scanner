@@ -15,14 +15,47 @@ services:
       timeout: 3s
       retries: 20
 
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_DATABASE: dblp_demo
+      MYSQL_USER: catalog
+      MYSQL_PASSWORD: catalog
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      # -h 127.0.0.1 (forces a real TCP connection), not -h localhost
+      # (which mysqladmin resolves to the Unix socket): MySQL's first-boot
+      # sequence briefly runs a temporary, socket-only instance to run its
+      # own init scripts, then shuts it down and restarts the real one
+      # with networking enabled. A socket-based ping reports "healthy"
+      # during that temporary instance, and seed can start connecting via
+      # TCP in the gap while the real instance is still coming up --
+      # confirmed by hitting exactly this ConnectionRefusedError once.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u catalog -pcatalog"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
   seed:
     build: ./seed-data
     depends_on:
       postgres:
         condition: service_healthy
+      mysql:
+        condition: service_healthy
     environment:
       POSTGRES_DSN: postgresql://catalog:catalog@postgres:5432/catalog_demo
       SQLITE_PATH: /data/tokyo_anaba.sqlite
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: catalog
+      MYSQL_PASSWORD: catalog
+      MYSQL_DATABASE: dblp_demo
     volumes:
       - sqlite-data:/data
 
@@ -35,6 +68,11 @@ services:
       CATALOG_DSN: postgresql://catalog:catalog@postgres:5432/catalog_demo
       SOURCE_POSTGRES_DSN: postgresql://catalog:catalog@postgres:5432/catalog_demo
       SOURCE_SQLITE_PATH: /data/tokyo_anaba.sqlite
+      SOURCE_MYSQL_HOST: mysql
+      SOURCE_MYSQL_PORT: "3306"
+      SOURCE_MYSQL_USER: catalog
+      SOURCE_MYSQL_PASSWORD: catalog
+      SOURCE_MYSQL_DATABASE: dblp_demo
     volumes:
       - sqlite-data:/data
 
@@ -64,3 +102,4 @@ services:
 volumes:
   pgdata:
   sqlite-data:
+  mysqldata:

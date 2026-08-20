@@ -1,0 +1,170 @@
+{
+  "authors": [
+    "Daniel Genkin",
+    "Daniel Gruss",
+    "Daniel Page",
+    "Davide Bellizia",
+    "Elisabeth Oswald",
+    "François-Xavier Standaert",
+    "Gilles Piret",
+    "Itamar Levi",
+    "Jean-Jacques Quisquater",
+    "Michael Schwarz 0001",
+    "Mike Hamburg",
+    "Moritz Lipp",
+    "Nigel P. Smart",
+    "Paul Kocher",
+    "Philippe Bulens",
+    "Stefan Mangard",
+    "Thomas Prescher 0002",
+    "Werner Haas 0004",
+    "Yuval Yarom"
+  ],
+  "papers": [
+    "journals/iet-ifs/BulensSQ10",
+    "journals/iet-ifs/MangardOS11",
+    "journals/iet-ifs/PiretS08",
+    "journals/iet-ifs/SmartOP08",
+    "journals/sncs/LeviBS22",
+    "tr/meltdown/m18",
+    "tr/meltdown/s18"
+  ],
+  "authorship": [
+    [
+      "Daniel Genkin",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Daniel Genkin",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Daniel Gruss",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Daniel Gruss",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Daniel Page",
+      "journals/iet-ifs/SmartOP08"
+    ],
+    [
+      "Davide Bellizia",
+      "journals/sncs/LeviBS22"
+    ],
+    [
+      "Elisabeth Oswald",
+      "journals/iet-ifs/MangardOS11"
+    ],
+    [
+      "Elisabeth Oswald",
+      "journals/iet-ifs/SmartOP08"
+    ],
+    [
+      "François-Xavier Standaert",
+      "journals/iet-ifs/BulensSQ10"
+    ],
+    [
+      "François-Xavier Standaert",
+      "journals/iet-ifs/MangardOS11"
+    ],
+    [
+      "François-Xavier Standaert",
+      "journals/iet-ifs/PiretS08"
+    ],
+    [
+      "François-Xavier Standaert",
+      "journals/sncs/LeviBS22"
+    ],
+    [
+      "Gilles Piret",
+      "journals/iet-ifs/PiretS08"
+    ],
+    [
+      "Itamar Levi",
+      "journals/sncs/LeviBS22"
+    ],
+    [
+      "Jean-Jacques Quisquater",
+      "journals/iet-ifs/BulensSQ10"
+    ],
+    [
+      "Michael Schwarz 0001",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Michael Schwarz 0001",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Mike Hamburg",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Mike Hamburg",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Moritz Lipp",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Moritz Lipp",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Nigel P. Smart",
+      "journals/iet-ifs/SmartOP08"
+    ],
+    [
+      "Paul Kocher",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Paul Kocher",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Philippe Bulens",
+      "journals/iet-ifs/BulensSQ10"
+    ],
+    [
+      "Stefan Mangard",
+      "journals/iet-ifs/MangardOS11"
+    ],
+    [
+      "Stefan Mangard",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Stefan Mangard",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Thomas Prescher 0002",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Thomas Prescher 0002",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Werner Haas 0004",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Werner Haas 0004",
+      "tr/meltdown/s18"
+    ],
+    [
+      "Yuval Yarom",
+      "tr/meltdown/m18"
+    ],
+    [
+      "Yuval Yarom",
+      "tr/meltdown/s18"
+    ]
+  ]
+}

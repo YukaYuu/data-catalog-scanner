@@ -5,20 +5,20 @@ heterogeneous data sources, normalize their schemas into one common metadata
 model, and serve that catalog over an API for searching.
 
 ```
-1. seed (Python)     loads real data into two "source" systems: a Postgres
-                      schema and a SQLite file.
-2. scanner (Python)  introspects both sources, normalizes their schemas,
-                      and writes the result into a catalog schema
+1. seed (Python)     loads real data into three "source" systems: a
+                      Postgres schema, a SQLite file, and a MySQL database.
+2. scanner (Python)  introspects all three sources, normalizes their
+                      schemas, and writes the result into a catalog schema
                       (catalog.tables / catalog.columns) in Postgres.
 3. api (Go)          reads the catalog schema and serves it over REST.
 4. web (TypeScript)  a read-only Next.js browser on top of the API.
 ```
 
-## Why two source types
+## Why three source types
 
 The actual hard part of a scanner isn't querying one database -- it's that
 every source exposes its schema through a completely different mechanism.
-This project deliberately scans two:
+This project deliberately scans three:
 
 - **PostgreSQL** (`source_realestate` schema) -- introspected via
   `information_schema`, including a real primary-key lookup and an actual
@@ -26,16 +26,32 @@ This project deliberately scans two:
 - **SQLite** (`tokyo_anaba.sqlite`) -- introspected via `PRAGMA table_info`,
   which reports primary keys and nullability in a totally different shape
   than `information_schema` does.
+- **MySQL** (`dblp_demo` database) -- also has an `information_schema`, but
+  it isn't a drop-in copy of Postgres's: primary keys show up directly on
+  `information_schema.columns` (`COLUMN_KEY='PRI'`) instead of needing the
+  constraint-table join Postgres requires, identifiers are quoted with
+  backticks instead of double quotes, and casting to text for min/max is
+  `CAST(col AS CHAR)` rather than `::text` or `CAST(col AS TEXT)`. Adding
+  this third connector was the actual test of whether `Connector` (see
+  `scanner/src/scanner/connectors/base.py`) generalizes, or was
+  accidentally designed around Postgres/SQLite's specific quirks.
 
-Both get normalized into the same `TableMetadata`/`ColumnMetadata` model
-(`scanner/src/scanner/models.py`) before being written to the catalog, so the
-API layer never has to know which engine a table actually came from.
+All three get normalized into the same `TableMetadata`/`ColumnMetadata`
+model (`scanner/src/scanner/models.py`) before being written to the catalog,
+so the API layer never has to know which engine a table actually came from.
 
-The source data is real, not generated: `source_realestate` is an actual
-real-estate transaction dataset (千代田区・文京区, 2021-2025) from another one
-of my projects, and the SQLite source is the spots/areas data from a Tokyo
-congestion-mapping app I built. Reusing real data with real irregularities
-felt more honest than a generic sample database.
+The source data is real, not generated, for all three:
+`source_realestate` is an actual real-estate transaction dataset
+(千代田区・文京区, 2021-2025) from another one of my projects, the SQLite
+source is the spots/areas data from a Tokyo congestion-mapping app I built,
+and the MySQL source (`dblp_demo`) is a real, connected slice of the DBLP
+co-authorship graph -- a 5-hop breadth-first search from the actual
+Meltdown vulnerability paper (`tr/meltdown/s18`), using a cached graph from
+a fourth project of mine (`bipartite-layout`). The authors are real
+published researchers (Daniel Genkin, Moritz Lipp, Paul Kocher, Yuval
+Yarom, among the actual co-authors of the Meltdown/Spectre papers), not
+placeholder names. Reusing real data with real irregularities felt more
+honest than a generic sample database.
 
 ## Running it
 
@@ -90,11 +106,13 @@ between "this column is TEXT" and "this column is TEXT, 1% NULL, mostly one
 of four values" -- the latter is what actually tells you whether a column is
 safe to join on or worth deduplicating.
 
-Both connectors compute all four columns in **one query per table**, not one
-per column -- an N+1 query pattern here would mean a table with 20 columns
-runs 20 separate scans of itself. `min_value`/`max_value` are stored as text
-(`CAST(...  AS TEXT)` / `::text`) rather than a typed value, for the same
-reason `data_type` is already a plain string: the common model has to
+All three connectors compute all four stats in **one query per table**, not
+one per column -- an N+1 query pattern here would mean a table with 20
+columns runs 20 separate scans of itself. `min_value`/`max_value` are
+stored as text (`::text` in Postgres, `CAST(... AS TEXT)` in SQLite,
+`CAST(... AS CHAR)` in MySQL -- three different syntaxes for the same idea)
+rather than a typed value, for the same reason `data_type` is already a
+plain string: the common model has to
 represent every SQL type uniformly, and a typed union would leak
 engine-specific type systems back into the API layer this project is trying
 to keep engine-agnostic.
@@ -111,9 +129,9 @@ surfaced it immediately: `building_structure`'s `min_value` was `"NaN"`
 (sorts before any Japanese text). Fixed in `seed-data/load_postgres_source.py`
 by adding the same `pd.notna(...)` guard to all four text columns.
 
-## Three bugs worth mentioning
+## Four bugs worth mentioning
 
-All three were caught by actually running the system end-to-end, not by
+All four were caught by actually running the system end-to-end, not by
 inspection:
 
 1. **NULL isn't equal to NULL for uniqueness.** The catalog's dedup key is
@@ -140,27 +158,45 @@ inspection:
    Postgres unconverted and landed in a `TEXT` column as a real, searchable
    `"NaN"` string instead of `NULL`.
 
+4. **A "healthy" MySQL container that still refused connections.**
+   `docker compose up` failed once with `ConnectionRefusedError`
+   immediately after compose reported the `mysql` service healthy. Cause:
+   MySQL's first-boot sequence runs a temporary, socket-only instance to
+   execute its own init scripts, then shuts it down and restarts the real
+   instance with networking enabled -- and the healthcheck
+   (`mysqladmin ping -h localhost`) resolves `localhost` to the Unix
+   socket, so it reports "healthy" during that temporary instance, not
+   the real one. Fixed two ways: the healthcheck now pings `127.0.0.1`
+   (forces a real TCP check, so it can't pass against the socket-only
+   instance), and `load_mysql_source.py` retries the connection a few
+   times with a short delay regardless, since a compose healthcheck
+   passing is a hint, not a guarantee, and the seed step should be able
+   to ride out a few seconds of the DB not actually being ready yet.
+
 ## Tech stack
 
-- **Python** (scanner, seed) -- `psycopg2` for Postgres, stdlib `sqlite3`
-  for SQLite, `pytest` for tests
+- **Python** (scanner, seed) -- `psycopg2` for Postgres, `PyMySQL` for
+  MySQL (pure Python, no C client library needed), stdlib `sqlite3` for
+  SQLite, `pytest` for tests
 - **Go** (API) -- stdlib `net/http` with Go 1.22+ pattern routing (no router
   dependency), `pgx` for Postgres
 - **TypeScript** (web) -- Next.js App Router, Server Components only (no
   client-side data fetching), Tailwind CSS
-- **PostgreSQL** as both a scan target and the catalog store
+- **PostgreSQL** as both a scan target and the catalog store; **MySQL** and
+  **SQLite** as additional scan targets
 - **Docker Compose** to wire the pipeline together
 
 ## Tests
 
 ```bash
-cd scanner && pytest -v                 # needs TEST_POSTGRES_DSN for the
-                                         # Postgres connector test; SQLite
-                                         # tests run standalone
+cd scanner && pytest -v                 # needs TEST_POSTGRES_DSN and
+                                         # TEST_MYSQL_HOST(+TEST_MYSQL_ROOT_PASSWORD)
+                                         # for those two connectors' tests;
+                                         # SQLite tests run standalone
 cd api && go test ./... -v              # handler tests use a fake Store,
                                          # no database needed
 ```
 
 CI (`.github/workflows/ci.yml`) runs both suites -- the scanner's Postgres
-test against a real Postgres service container, not skipped -- plus a full
-`docker compose build`.
+*and* MySQL tests against real service containers, neither skipped -- plus
+`web-checks` (lint/test/build) and a full `docker compose build`.

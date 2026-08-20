@@ -2,6 +2,7 @@ import os
 import sys
 
 from scanner.catalog_store import CatalogStore
+from scanner.connectors.mysql import MySQLConnector
 from scanner.connectors.postgres import PostgresConnector
 from scanner.connectors.sqlite import SQLiteConnector
 
@@ -42,6 +43,14 @@ def main() -> None:
         SQLiteConnector(
             source_name="tokyo_anaba_spots",
             db_path=source_sqlite_path,
+        ),
+        MySQLConnector(
+            source_name="dblp_coauthorship",
+            host=os.environ["SOURCE_MYSQL_HOST"],
+            port=int(os.environ.get("SOURCE_MYSQL_PORT", "3306")),
+            user=os.environ["SOURCE_MYSQL_USER"],
+            password=os.environ["SOURCE_MYSQL_PASSWORD"],
+            database=os.environ["SOURCE_MYSQL_DATABASE"],
         ),
     ]
 
